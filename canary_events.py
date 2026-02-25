@@ -209,8 +209,12 @@ def analyze_frequency(port_scans: List[Dict]) -> None:
         print(f"{month}: {count:>3} {bar}")
 
 
-def show_repeat_offenders(port_scans: List[Dict]) -> None:
-    """Display IPs with multiple scans (exclude single-scan IPs)"""
+def show_repeat_offenders(port_scans: List[Dict]) -> List[tuple]:
+    """Display IPs with multiple scans (exclude single-scan IPs)
+
+    Returns:
+        List of (ip, count) tuples for repeat offenders
+    """
     # Count occurrences by IP
     ip_counter = Counter([get_incident_ip(inc) for inc in port_scans])
 
@@ -220,7 +224,7 @@ def show_repeat_offenders(port_scans: List[Dict]) -> None:
 
     if not repeat_offenders:
         print("\nNo repeat offenders found (all IPs scanned only once).")
-        return
+        return []
 
     print("\n" + "="*60)
     print("REPEAT OFFENDERS (Excluding Single-Scan IPs)")
@@ -235,6 +239,70 @@ def show_repeat_offenders(port_scans: List[Dict]) -> None:
     total_repeat_scans = sum(count for _, count in repeat_offenders)
     print(f"Total scans from repeat offenders: {total_repeat_scans}")
     print(f"Percentage of all scans: {(total_repeat_scans / len(port_scans)) * 100:.1f}%")
+
+    return repeat_offenders
+
+
+def show_ip_timeline(ip_address: str, port_scans: List[Dict]) -> None:
+    """Display detailed timeline for a specific IP address"""
+    # Filter scans for this IP
+    ip_scans = [inc for inc in port_scans if get_incident_ip(inc) == ip_address]
+
+    if not ip_scans:
+        print(f"\nNo scans found for {ip_address}")
+        return
+
+    # Sort by timestamp
+    ip_scans.sort(key=lambda x: get_incident_timestamp(x))
+
+    # Get timestamps
+    timestamps = [get_incident_timestamp(inc) for inc in ip_scans]
+
+    print("\n" + "="*60)
+    print(f"TIMELINE FOR {ip_address}")
+    print("="*60)
+
+    # Summary statistics
+    first_scan = timestamps[0]
+    last_scan = timestamps[-1]
+    duration = (last_scan - first_scan).days
+
+    print(f"\nFirst scan: {first_scan.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Last scan:  {last_scan.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Duration:   {duration} days")
+    print(f"Total scans: {len(ip_scans)}")
+
+    if duration > 0:
+        print(f"Average frequency: {len(ip_scans) / duration:.2f} scans/day")
+
+    # Calculate time gaps between scans
+    if len(timestamps) > 1:
+        gaps = [(timestamps[i+1] - timestamps[i]).total_seconds() / 3600 for i in range(len(timestamps)-1)]
+        avg_gap = sum(gaps) / len(gaps)
+        min_gap = min(gaps)
+        max_gap = max(gaps)
+
+        print(f"\nTime between scans:")
+        print(f"  Average: {avg_gap:.1f} hours")
+        print(f"  Shortest: {min_gap:.1f} hours")
+        print(f"  Longest: {max_gap:.1f} hours")
+
+    # Display timeline
+    print("\n" + "-"*60)
+    print("SCAN TIMELINE:")
+    print("-"*60)
+    print(f"{'#':<4} {'Date':<12} {'Time':<10} {'Days Since Previous'}")
+    print("-"*60)
+
+    for idx, (scan, ts) in enumerate(zip(ip_scans, timestamps), 1):
+        days_since = ""
+        if idx > 1:
+            days_diff = (ts - timestamps[idx-2]).days
+            days_since = f"{days_diff} days" if days_diff > 0 else "same day"
+
+        print(f"{idx:<4} {ts.strftime('%Y-%m-%d'):<12} {ts.strftime('%H:%M:%S'):<10} {days_since}")
+
+    print("-"*60)
 
 
 def main():
@@ -279,7 +347,39 @@ def main():
         print("\n" + "="*60)
         response = input("\nShow repeat offenders (IPs with >1 scan)? (y/n): ").strip().lower()
         if response in ['y', 'yes']:
-            show_repeat_offenders(port_scans)
+            repeat_offenders = show_repeat_offenders(port_scans)
+
+            # Offer to show timeline for specific IP
+            if repeat_offenders:
+                print("\n" + "="*60)
+                response = input("\nShow timeline for a specific IP? (y/n): ").strip().lower()
+                if response in ['y', 'yes']:
+                    # Display available IPs with numbers
+                    print("\nSelect an IP address:")
+                    for idx, (ip, count) in enumerate(repeat_offenders, 1):
+                        print(f"  {idx}. {ip} ({count} scans)")
+
+                    # Get user selection
+                    try:
+                        choice = input("\nEnter number (or IP address): ").strip()
+
+                        # Try to parse as number first
+                        if choice.isdigit():
+                            idx = int(choice) - 1
+                            if 0 <= idx < len(repeat_offenders):
+                                selected_ip = repeat_offenders[idx][0]
+                            else:
+                                print(f"Invalid selection. Please choose 1-{len(repeat_offenders)}")
+                                selected_ip = None
+                        else:
+                            # Treat as IP address
+                            selected_ip = choice
+
+                        if selected_ip:
+                            show_ip_timeline(selected_ip, port_scans)
+
+                    except (ValueError, IndexError):
+                        print("Invalid input.")
 
 
 if __name__ == '__main__':
