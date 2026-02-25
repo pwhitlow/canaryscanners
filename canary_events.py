@@ -11,6 +11,7 @@ import json
 import requests
 from datetime import datetime
 from typing import Optional, Dict, List
+from collections import Counter
 
 
 class CanaryAPI:
@@ -129,6 +130,78 @@ def format_incident(incident: Dict) -> str:
     return f"{src_ip:<18} {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
 
 
+def get_incident_ip(incident: Dict) -> str:
+    """Extract source IP from incident"""
+    incident_data = incident.get('description', {})
+    return incident_data.get('src_host', 'Unknown')
+
+
+def get_incident_timestamp(incident: Dict) -> datetime:
+    """Extract timestamp from incident"""
+    incident_data = incident.get('description', {})
+    timestamp_str = incident_data.get('created', '0')
+    return datetime.fromtimestamp(int(timestamp_str))
+
+
+def analyze_by_ip(port_scans: List[Dict]) -> None:
+    """Analyze and display port scans grouped by source IP"""
+    # Count occurrences by IP
+    ip_counter = Counter([get_incident_ip(inc) for inc in port_scans])
+
+    print("\n" + "="*60)
+    print("PORT SCAN ANALYSIS - GROUPED BY SOURCE IP")
+    print("="*60)
+    print(f"\n{'Source IP':<18} {'Scan Count':<12} {'Percentage'}")
+    print("-"*60)
+
+    total_scans = len(port_scans)
+    for ip, count in ip_counter.most_common():
+        percentage = (count / total_scans) * 100
+        print(f"{ip:<18} {count:<12} {percentage:>6.1f}%")
+
+    print(f"\nTotal unique IPs: {len(ip_counter)}")
+    print(f"Total port scans: {total_scans}")
+
+
+def analyze_frequency(port_scans: List[Dict]) -> None:
+    """Analyze scanning frequency and patterns"""
+    if not port_scans:
+        return
+
+    # Get all timestamps
+    timestamps = [get_incident_timestamp(inc) for inc in port_scans]
+    timestamps.sort()
+
+    # Find date range
+    earliest = timestamps[0]
+    latest = timestamps[-1]
+    days_span = (latest - earliest).days + 1
+
+    # Count by month
+    monthly_counts = Counter([ts.strftime('%Y-%m') for ts in timestamps])
+
+    # Get top scanner
+    ip_counter = Counter([get_incident_ip(inc) for inc in port_scans])
+    top_scanner, top_count = ip_counter.most_common(1)[0]
+
+    print("\n" + "="*60)
+    print("FREQUENCY ANALYSIS")
+    print("="*60)
+    print(f"\nTime Period: {earliest.strftime('%Y-%m-%d')} to {latest.strftime('%Y-%m-%d')}")
+    print(f"Duration: {days_span} days")
+    print(f"Average scans per day: {len(port_scans) / days_span:.1f}")
+    print(f"\nMost active scanner: {top_scanner} ({top_count} scans)")
+    print(f"Top scanner percentage: {(top_count / len(port_scans)) * 100:.1f}%")
+
+    print("\n" + "-"*60)
+    print("Monthly Distribution:")
+    print("-"*60)
+    for month in sorted(monthly_counts.keys(), reverse=True):
+        count = monthly_counts[month]
+        bar = '█' * int(count / 2)
+        print(f"{month}: {count:>3} {bar}")
+
+
 def main():
     """Main execution function"""
     # Get credentials from environment variables
@@ -162,6 +235,10 @@ def main():
         print("="*60)
         for incident in port_scans:
             print(format_incident(incident))
+
+        # Display analysis
+        analyze_by_ip(port_scans)
+        analyze_frequency(port_scans)
 
 
 if __name__ == '__main__':
