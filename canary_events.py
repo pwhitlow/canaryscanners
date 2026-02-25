@@ -107,8 +107,15 @@ class CanaryAPI:
             return []
 
 
+def is_port_scan(incident: Dict) -> bool:
+    """Check if incident is a port scan"""
+    incident_data = incident.get('description', {})
+    incident_type = incident_data.get('description', '')
+    return 'Port Scan' in incident_type
+
+
 def format_incident(incident: Dict) -> str:
-    """Format incident for display"""
+    """Format incident for display - simplified for port scans"""
     # The Canary API nests actual incident data inside 'description' field
     incident_data = incident.get('description', {})
 
@@ -116,20 +123,10 @@ def format_incident(incident: Dict) -> str:
     timestamp_str = incident_data.get('created', '0')
     timestamp = datetime.fromtimestamp(int(timestamp_str))
 
-    # Convert acknowledged string to boolean
-    acknowledged = incident_data.get('acknowledged', 'False') == 'True'
+    # Get source IP
+    src_ip = incident_data.get('src_host', 'N/A')
 
-    return f"""
-Incident ID: {incident.get('id')}
-Type: {incident_data.get('description', 'N/A')}
-Timestamp: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-Source IP: {incident_data.get('src_host', 'N/A')}
-Destination: {incident_data.get('dst_host', 'N/A')}
-Device Name: {incident_data.get('name', 'N/A')}
-Device ID: {incident_data.get('node_id', 'N/A')}
-Flock: {incident_data.get('flock_name', 'N/A')}
-Acknowledged: {acknowledged}
-{"="*60}"""
+    return f"{src_ip:<18} {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
 
 
 def main():
@@ -150,25 +147,21 @@ def main():
     api = CanaryAPI(console_domain, api_key)
 
     # Retrieve incidents
-    print("Fetching incidents from Canary console...")
-    print("="*60)
+    print("Fetching port scan incidents from Canary console...\n")
 
-    incidents = api.get_all_incidents(limit=50)
+    incidents = api.get_all_incidents(limit=100)
 
-    if not incidents:
-        print("No incidents found.")
+    # Filter for port scans only
+    port_scans = [inc for inc in incidents if is_port_scan(inc)]
+
+    if not port_scans:
+        print("No port scan incidents found.")
     else:
-        print(f"\nFound {len(incidents)} incidents:\n")
-        for incident in incidents:
+        print(f"Found {len(port_scans)} port scan incidents:\n")
+        print(f"{'Source IP':<18} {'Timestamp'}")
+        print("="*60)
+        for incident in port_scans:
             print(format_incident(incident))
-
-    # Show unacknowledged count
-    unack_incidents = api.get_unacknowledged_incidents()
-    print(f"\n{len(unack_incidents)} unacknowledged incidents")
-
-    # Show device count
-    devices = api.get_devices()
-    print(f"{len(devices)} active Canary devices")
 
 
 if __name__ == '__main__':
