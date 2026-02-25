@@ -29,11 +29,12 @@
    - `CANARY_CONSOLE_DOMAIN` - Your Canary console domain (e.g., `1234abc.canary.tools`)
    - `CANARY_API_KEY` - Your API key from Canary console (Settings → API)
 
-4. **Load credentials and run:**
+4. **Run the script:**
    ```bash
-   export $(cat .env | xargs)
    python3 canary_events.py
    ```
+
+   The script automatically loads credentials from the `.env` file.
 
 ### Alternative: Manual Setup
 
