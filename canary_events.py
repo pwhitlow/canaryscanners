@@ -349,11 +349,14 @@ def main():
         if response in ['y', 'yes']:
             repeat_offenders = show_repeat_offenders(port_scans)
 
-            # Offer to show timeline for specific IP
+            # Offer to show timeline for specific IP (loop until user exits)
             if repeat_offenders:
-                print("\n" + "="*60)
-                response = input("\nShow timeline for a specific IP? (y/n): ").strip().lower()
-                if response in ['y', 'yes']:
+                while True:
+                    print("\n" + "="*60)
+                    response = input("\nShow timeline for a specific IP? (y/n): ").strip().lower()
+                    if response not in ['y', 'yes']:
+                        break
+
                     # Display available IPs with numbers
                     print("\nSelect an IP address:")
                     for idx, (ip, count) in enumerate(repeat_offenders, 1):
@@ -370,7 +373,7 @@ def main():
                                 selected_ip = repeat_offenders[idx][0]
                             else:
                                 print(f"Invalid selection. Please choose 1-{len(repeat_offenders)}")
-                                selected_ip = None
+                                continue
                         else:
                             # Treat as IP address
                             selected_ip = choice
@@ -380,6 +383,7 @@ def main():
 
                     except (ValueError, IndexError):
                         print("Invalid input.")
+                        continue
 
 
 if __name__ == '__main__':
