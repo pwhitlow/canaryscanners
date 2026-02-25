@@ -29,6 +29,9 @@ class CanaryAPI:
             console_domain: Your Canary console domain (e.g., '1234abc.canary.tools')
             api_key: Your API authentication token
         """
+        # Strip protocol if present (handle both http:// and https://)
+        console_domain = console_domain.replace('https://', '').replace('http://', '').strip('/')
+
         self.base_url = f"https://{console_domain}/api/v1"
         self.api_key = api_key
         self.session = requests.Session()
