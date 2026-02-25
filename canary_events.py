@@ -109,16 +109,26 @@ class CanaryAPI:
 
 def format_incident(incident: Dict) -> str:
     """Format incident for display"""
-    timestamp = datetime.fromtimestamp(incident.get('created', 0))
+    # The Canary API nests actual incident data inside 'description' field
+    incident_data = incident.get('description', {})
+
+    # Handle timestamp - API returns it as string
+    timestamp_str = incident_data.get('created', '0')
+    timestamp = datetime.fromtimestamp(int(timestamp_str))
+
+    # Convert acknowledged string to boolean
+    acknowledged = incident_data.get('acknowledged', 'False') == 'True'
 
     return f"""
 Incident ID: {incident.get('id')}
-Description: {incident.get('description', 'N/A')}
+Type: {incident_data.get('description', 'N/A')}
 Timestamp: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-Source IP: {incident.get('src_host', 'N/A')}
-Destination: {incident.get('dst_host', 'N/A')}
-Device: {incident.get('node_id', 'N/A')}
-Acknowledged: {incident.get('acknowledged', False)}
+Source IP: {incident_data.get('src_host', 'N/A')}
+Destination: {incident_data.get('dst_host', 'N/A')}
+Device Name: {incident_data.get('name', 'N/A')}
+Device ID: {incident_data.get('node_id', 'N/A')}
+Flock: {incident_data.get('flock_name', 'N/A')}
+Acknowledged: {acknowledged}
 {"="*60}"""
 
 
