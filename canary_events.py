@@ -202,6 +202,34 @@ def analyze_frequency(port_scans: List[Dict]) -> None:
         print(f"{month}: {count:>3} {bar}")
 
 
+def show_repeat_offenders(port_scans: List[Dict]) -> None:
+    """Display IPs with multiple scans (exclude single-scan IPs)"""
+    # Count occurrences by IP
+    ip_counter = Counter([get_incident_ip(inc) for inc in port_scans])
+
+    # Filter to only IPs with more than 1 scan
+    repeat_offenders = [(ip, count) for ip, count in ip_counter.items() if count > 1]
+    repeat_offenders.sort(key=lambda x: x[1], reverse=True)
+
+    if not repeat_offenders:
+        print("\nNo repeat offenders found (all IPs scanned only once).")
+        return
+
+    print("\n" + "="*60)
+    print("REPEAT OFFENDERS (Excluding Single-Scan IPs)")
+    print("="*60)
+    print(f"\n{'Rank':<6} {'Source IP':<18} {'Scan Count'}")
+    print("-"*60)
+
+    for rank, (ip, count) in enumerate(repeat_offenders, 1):
+        print(f"{rank:<6} {ip:<18} {count}")
+
+    print(f"\nTotal repeat offenders: {len(repeat_offenders)}")
+    total_repeat_scans = sum(count for _, count in repeat_offenders)
+    print(f"Total scans from repeat offenders: {total_repeat_scans}")
+    print(f"Percentage of all scans: {(total_repeat_scans / len(port_scans)) * 100:.1f}%")
+
+
 def main():
     """Main execution function"""
     # Get credentials from environment variables
@@ -239,6 +267,12 @@ def main():
         # Display analysis
         analyze_by_ip(port_scans)
         analyze_frequency(port_scans)
+
+        # Offer to show repeat offenders
+        print("\n" + "="*60)
+        response = input("\nShow repeat offenders (IPs with >1 scan)? (y/n): ").strip().lower()
+        if response in ['y', 'yes']:
+            show_repeat_offenders(port_scans)
 
 
 if __name__ == '__main__':
